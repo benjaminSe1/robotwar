@@ -1,9 +1,12 @@
+//Binôme Benjamin et Mathis
+
 function iaGenerator(mapSize) {
     var positionRel = {x: "", y: ""};
     var isXGood = false;
     var isYGood = false;
     var thereIsAWinner = false;
     var winnerPos = {x: "", y: ""};
+    var isTp = false;
 
     return {
         /**
@@ -36,6 +39,9 @@ function iaGenerator(mapSize) {
          */
         onResponseX: function onResponseX(hPosition) {
             positionRel.x = hPosition;
+            if(hPosition == 0){
+                isXGood = true;
+            }
         },
 
         /**
@@ -47,6 +53,9 @@ function iaGenerator(mapSize) {
          */
         onResponseY: function (vPosition) {
             positionRel.y = vPosition;
+            if(vPosition == 0){
+                isYGood = true;
+            }
         },
 
         /**
@@ -56,34 +65,47 @@ function iaGenerator(mapSize) {
          *
          * @param {object} position - la position actuelle de votre bot
          * @param {number} round - le numéro de tour en cours
+         * @param {object} walls - les murs du jeu
          * @return {object} action - l'action à effectuer
          */
         action: function action(position, round, walls) {
             var action = {};
-            if (thereIsAWinner) {
+            if (thereIsAWinner && !isTp) {
                 action = {
                     action: "teleport",
                     params: {
-                        x: winnerPos.x,
+                        x: winnerPos.x-1,
                         y: winnerPos.y
                     }
                 }
+                isTp = true;
+            }else if(thereIsAWinner && isTp){
+                action = {
+                    action: "move",
+                    params: {
+                        dx: 1,
+                        dy: 0
+                    }
+                }
             }
-            if (round % 5 === 0 && !isXGood && !isYGood) {
+            if (round % 3 === 0 && !isXGood && !isYGood) {
+                //console.log("round % 3 === 0 && !isXGood && !isYGood");
                 positionRel.x = null;
-                positionRel.y = null;   
-            } else if (round % 5 == 0 && !isXGood) {
+                positionRel.y = null;
+            } else if (round % 3 == 0 && !isXGood) {
+                //console.log("round % 3 == 0 && !isXGood");
                 positionRel.x = null;
-            } else if (round % 5 == 0 && !isYGood) {
+            } else if (round % 3 == 0 && !isYGood) {
+                //console.log("round % 3 == 0 && !isYGood");
                 positionRel.y = null;
             }
-            if (positionRel.x == null && !isXGood && round % 5 == 0) {
+            if (positionRel.x == null && !isXGood && round % 3 == 0) {
                 action = {
                     action: "ask",
                     params: "x" //ou y
                 }
                 return action;
-            } else if (positionRel.y == null && !isYGood && round % 5 == 1) {
+            } else if (positionRel.y == null && !isYGood && round % 3 == 1) {
                 action = {
                     action: "ask",
                     params: "y" //ou y
@@ -91,15 +113,32 @@ function iaGenerator(mapSize) {
                 return action;
             } else {
                 if (!isXGood && !isYGood) {
-                    action = {
-                        action: "move",
-                        params: {
-                            dx: positionRel.x, //1 mouvement positif, -1 mouvement négatif, 0 aucun mouvement sur cet axe
-                            dy: positionRel.y
-                        }
+                    if(checkWall(position, walls, positionRel) == undefined){
+                      console.log("Pas de mur");
+                      action = {
+                          action: "move",
+                          params: {
+                              dx: positionRel.x, //1 mouvement positif, -1 mouvement négatif, 0 aucun mouvement sur cet axe
+                              dy: positionRel.y
+                          }
+                      }
                     }
-                }
-                else if (!isXGood) {
+                    else{
+                      var par = checkWall(position, walls, positionRel);
+                      console.log(par);
+                      var parX = par.dx;
+                      var parY = par.dy;
+                      action = {
+                          action: "move",
+                          params: {
+                            dx : parX,
+                            dy : parY
+                          }
+                      }
+                    }
+                } else if (!isXGood) {
+                  if(checkWall(position, walls, positionRel) == undefined){
+                    console.log("Pas de mur");
                     action = {
                         action: "move",
                         params: {
@@ -107,7 +146,23 @@ function iaGenerator(mapSize) {
                             dy: 0
                         }
                     }
+                  }
+                  else{
+                    par = checkWall(position, walls, positionRel);
+                    console.log(par);
+                    parX = par.dx;
+                    parY = par.dy;
+                    action = {
+                        action: "move",
+                        params: {
+                          dx : parX,
+                          dy : parY
+                        }
+                    }
+                  }
                 } else if (!isYGood) {
+                  if(checkWall(position, walls, positionRel) == undefined){
+                    console.log("Pas de mur");
                     action = {
                         action: "move",
                         params: {
@@ -115,11 +170,222 @@ function iaGenerator(mapSize) {
                             dy: positionRel.y
                         }
                     }
+                  }
+                  else{
+                    par = checkWall(position, walls, positionRel);
+                    console.log(par);
+                    parX = par.dx;
+                    parY = par.dy;
+                    action = {
+                        action: "move",
+                        params: {
+                          dx : parX,
+                          dy : parY
+                        }
+                    }
+                  }
+
                 }
                 return action;
             }
         }
     };
+    function checkWall(pos, walls, positionRel){
+      var tmpPosX = pos.x + positionRel.x;
+      var tmpPosY = pos.y + positionRel.y;
+      var tmp1 = false;
+      var tmp2 = false;
+
+        var isAWall = false;
+        for(var i = 0; i < walls.length; i++){
+            if(tmpPosX == walls[i].x && tmpPosY == walls[i].y){ //mur ou on va
+                console.log("IsaWall");
+                isAWall = true;
+            }
+        }
+        if(!isAWall)return undefined;
+
+        if(positionRel.x == -1 && positionRel.y == 0){
+          console.log("Mur à gauche");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x-1 == walls[i].x && pos.y == walls[i].y){ //mur à gauche
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(var j = 0; j < walls.length; j++){
+                        if(pos.x-1 != walls[j].x && pos.y-1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : -1, dy : -1};
+                    else return {dx : -1, dy : 1};
+                }
+            }
+        }
+        else if(positionRel.x == 1 && positionRel.y == 0){
+          console.log("Mur à droite");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x+1 == walls[i].x && pos.y == walls[i].y){ //mur à droite
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x+1 != walls[j].x && pos.y-1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : 1, dy : -1};
+                    else return {dx : -1, dy : -1};
+                }
+            }
+        }
+        else if(positionRel.y == -1 && positionRel.x == 0){
+          console.log("Mur à haut");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x == walls[i].x && pos.y-1 == walls[i].y){ //mur en haut
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x-1 != walls[j].x && pos.y-1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : -1, dy : -1};
+                    else return {dx : 1, dy : -1};
+                }
+            }
+        }
+        else if(positionRel.y == 1 && positionRel.x == 0){
+          console.log("Mur à bas");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x == walls[i].x && pos.y+1 == walls[i].y){ //mur en bas
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x-1 != walls[j].x && pos.y+1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : -1, dy : 1};
+                    else return {dx : 1, dy : 1};
+                }
+            }
+        }
+
+
+
+
+        else if(positionRel.y == -1 && positionRel.x == -1){ //mur en haut a gauche
+          console.log("Mur à haut gauche");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x-1 == walls[i].x && pos.y-1 == walls[i].y){
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x != walls[j].x && pos.y+1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : 0, dy : 1};
+                    else return {dx : -1, dy : 0};
+                }
+            }
+        }
+        else if(positionRel.y == -1 && positionRel.x == 1){
+          console.log("Mur à haut droite");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x+1 == walls[i].x && pos.y-1 == walls[i].y){ //mur en haut a droite
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x != walls[j].x && pos.y-1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1)return {dx : 0, dy : -1};
+                    else return {dx : 1, dy : 0};
+                }
+            }
+        }
+        else if(positionRel.y == 1 && positionRel.x == -1){
+          console.log("Mur à bas gauche");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x-1 == walls[i].x && pos.y+1 == walls[i].y){ //mur en bas a gauche
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x != walls[j].x && pos.y+1 != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                    if(tmp1) return {dx : 0, dy : 1};
+                    else return {dx : -1, dy : 0};
+                }
+            }
+        }
+        else if(positionRel.y == 1 && positionRel.x == 1){
+          console.log("Mur à bas droit");
+            for(i = 0; i < walls.length; i++){
+                if(pos.x+1 == walls[i].x && pos.y+1 == walls[i].y){ //mur en bas a droite
+                  tmp1 = false;
+                  tmp2 = false;
+                    for(j = 0; j < walls.length; j++){
+                        if(pos.x+1 != walls[j].x && pos.y != walls[j].y){
+                            tmp1 = true;
+                        }else{
+                            tmp2 = true;
+                        }
+                    }
+                  if(tmp1)return {dx : 1, dy : 0};
+                  else return {dx : 0, dy : 1};
+                }
+            }
+        }
+        /*for(var i = 0; i < walls.length; i++){
+            if(pos.x-1 == walls[i].x && pos.y == walls[i].y){ //mur à gauche
+
+            }
+            else if(pos.x+1 == walls[i].x && pos.y == walls[i].y){ //mur à droite
+                return {dx : ""}
+            }
+            else if(pos.x == walls[i].x && pos.y+1 == walls[i].y){ //mur en bas
+                return {dx : ""}
+            }
+            else if(pos.x == walls[i].x && pos.y-1 == walls[i].y){ //mur en haut
+                return {dx : ""}
+            }
+
+
+
+            else if(pos.x+1 == walls[i].x && pos.y+1 == walls[i].y){ //mur bas a droite
+                return {dx : ""}
+            }
+            else if(pos.x+1 == walls[i].x && pos.y-1 == walls[i].y){ //mur en haut a droite
+                return {dx : ""}
+            }
+            else if(pos.x-1 == walls[i].x && pos.y-1 == walls[i].y){ //mur en haut à gauche
+                return {dx : ""}
+            }
+            else if(pos.x-1 == walls[i].x && pos.y+1 == walls[i].y){ //mur en bas à gauche
+                return {dx : ""}
+            }
+        }*/
+        else{
+          return undefined;
+        }
+    }
 }
 
-module.ex
+module.exports = iaGenerator;
